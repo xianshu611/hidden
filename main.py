@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from typing import List, Dict, Any
 
 import streamlit as st
@@ -60,7 +61,8 @@ essay = st.text_area(
     "Paste student's writing here / 학생 글을 붙여넣으세요",
     height=280,
     placeholder=(
-        "예: 기술 발전은 사회를 어떻게 바꾸는가에 대한 나의 생각은…\n"
+        "예: 기술 발전은 사회를 어떻게 바꾸는가에 대한 나의 생각은…
+"
         "(철자·띄어쓰기·문장 오류가 있어도 괜찮아요. 모두 잡아 드립니다.)"
     ),
 )
@@ -172,6 +174,48 @@ def build_user_prompt(topic_label: str, custom_topic: str, essay: str, lang_choi
 
 
 # ----------------------------
+# JSON parsing helpers (robust)
+# ----------------------------
+
+def _extract_json_block(text: str) -> str:
+    """Try to salvage a JSON object from text with code fences or leading junk."""
+    # Strip code fences
+    cleaned = text.strip()
+    cleaned = cleaned.replace("```json", "").replace("```", "").strip()
+
+    # If already valid JSON
+    try:
+        json.loads(cleaned)
+        return cleaned
+    except Exception:
+        pass
+
+    # Heuristic: take substring from first '{' to last '}'
+    start = cleaned.find('{')
+    end = cleaned.rfind('}')
+    if start != -1 and end != -1 and end > start:
+        candidate = cleaned[start:end + 1]
+        try:
+            json.loads(candidate)
+            return candidate
+        except Exception:
+            pass
+
+    # Fallback to original text
+    return cleaned
+
+
+def parse_json_safely(text: str) -> Dict[str, Any]:
+    text = (text or "").strip()
+    # Fast path
+    try:
+        return json.loads(text)
+    except Exception:
+        candidate = _extract_json_block(text)
+        return json.loads(candidate)
+
+
+# ----------------------------
 # OpenAI Call
 # ----------------------------
 
@@ -187,7 +231,8 @@ def call_openai(prompt: str, api_key: str, model: str) -> Dict[str, Any]:
         response_format={"type": "json_object"},
     )
     text = completion.choices[0].message.content
-    return json.loads(text)
+    # --- HARDENING: remove stray whitespace and code fences, then parse safely
+    return parse_json_safely(text)
 
 
 # ----------------------------
@@ -259,7 +304,9 @@ if st.button("🚀 Evaluate", type="primary", use_container_width=True):
                         with st.expander(f"Improvement {i}"):
                             st.markdown(f"**Issue**: {imp.get('issue','')}")
                             st.markdown(f"**Suggestion**: {imp.get('suggestion','')}")
-                            st.markdown(f"**Rewrite Example**:\n\n> {imp.get('rewrite_example','')}")
+                            st.markdown(f"**Rewrite Example**:
+
+> {imp.get('rewrite_example','')}")
 
                 # Corrections
                 render_corrections(result)
@@ -273,7 +320,9 @@ if st.button("🚀 Evaluate", type="primary", use_container_width=True):
                 )
 
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error("JSON parsing failed or API error occurred.")
+                with st.expander("Show technical details"):
+                    st.exception(e)
 
 # Footer
 st.markdown("---")
