@@ -35,10 +35,7 @@ st.sidebar.markdown(
 # Topics
 # ----------------------------
 DEFAULT_TOPICS = [
-    "Does technological development change society? / 기술 발전은 사회를 변화시키는가?",
-    "Wild Robot: Technology & Nature Coexistence / 와일드 로봇: 기술과 자연의 공존",
-    "Digital Citizenship & Online Etiquette / 디지털 시민성과 온라인 예절",
-    "AI Ethics in School Life / 학교생활 속 AI 윤리",
+    "Does technological development change society? / 기술 발전은 사회를 변화시키는가?"
 ]
 
 st.title("📝 Student Writing Evaluator • Streamlit + OpenAI")
